@@ -15,8 +15,8 @@ def configuration_score(
     - Use problem.score_components(configuration); ya retorna cobertura,
       redundancia y exposición en ese orden.
     """
-    # TODO: Add your code here
-    raise NotImplementedError("Punto 1: implemente configuration_score")
+    cobertura, reundancia, exposicion = problem.score_components(configuration)
+    return cobertura - reundancia - exposicion
 
 
 def hill_climbing(
@@ -38,8 +38,86 @@ def hill_climbing(
     - Inicialice los historiales con la configuración inicial y agregue solo las
       mejoras aceptadas antes de retornar el OptimizationResult.
     """
-    # TODO: Add your code here
-    raise NotImplementedError("Punto 1: implemente hill_climbing")
+    
+    """
+    En este problema hay que retornar un 'OptimizationResult'. Esta clase tiene
+    esta estructura:
+        best_configuration: Configuration
+        best_score: float
+        evaluations: int
+        iterations: int
+        history: list[Configuration] = field(default_factory=list)
+        score_history: list[float] = field(default_factory=list)
+        
+    Hay que manetener todos los valores que pide esta clase.
+    
+    Estructura general de mi funcion:
+    - crear current, un obj tipo OptimizationResult con una copia de 
+      initial_config como best_config y el puntaje de initial_config como 
+      best_score
+    - un loop que cada iteración:
+        - genera los vecinos de current
+        - compara los vecinos
+            - busca el mejor 
+        - actualiza current (evals, iters)
+        - si el mejor vecino es mejor que current:
+            - actualiza current (best_config, best_score, hist, score_hist)
+        - si no hay vecinos mejor que current:
+            - return current
+    - return current
+    """
+    #Creamos una copia de initial_config para no cambiarlo
+    current_config=[]
+    for i in initial_configuration:
+        current_config.append(i)
+    
+    tuple_current_config = tuple(current_config)
+    current_score = configuration_score(problem, tuple_current_config)
+    current =  OptimizationResult(tuple_current_config ,
+                                 current_score,
+                                 1,0,[tuple_current_config],[current_score])
+    
+    #comenzamos el loop
+    for i in range(max_iterations):
+        #generemos los vecinos 
+        list_neighbors = problem.neighbors(initial_configuration)
+        
+        #preparamos y comenzamos un ciclo para comparar los vecinos
+        evals_per_cycle = 0
+        for neighbor in list_neighbors:
+            #si hay vecinos mejores que current, el mejor quedara en estas 
+            #variables
+            max_neighbor = None
+            max_neighbor_score = 0
+            
+            #queremos evitar hacer mas evaluaciones de la cuenta 
+            #entonces guardamos config_score en una variable
+            temp_neighbor_score = configuration_score(problem, neighbor)
+            #sumamos 1 por cada vez que hacemos config_eval
+            evals_per_cycle =+ 1
+            if temp_neighbor_score > current.best_score:
+                max_neighbor_score = temp_neighbor_score
+            
+            
+        #actualizemos current:
+        #evals y iters
+        current.evaluations += evals_per_cycle
+        current.iterations += 1
+        #Si hay un vecino mejor que current hay que actualizar:
+        #best_config, best_score, hist, score_hist
+        if max_neighbor != None:
+            current.best_score = max_neighbor_score
+            current.best_configuration = max_neighbor
+            current.history.append(max_neighbor)
+            current.score_history.append(max_neighbor_score)
+        #si no, entonces estamos en el maximo local
+        else:
+            return current
+    
+    #si se cierra el loop es que llegamos a max_iterations
+    #entonces, retornamos current
+    return current
+            
 
 
 def cooling_schedule(initial_temperature: float, cooling_rate: float, iteration: int) -> float:
@@ -160,3 +238,5 @@ def genetic_algorithm(
 
     # TODO: Add your code here
     raise NotImplementedError("Punto 3: implemente genetic_algorithm")
+
+
