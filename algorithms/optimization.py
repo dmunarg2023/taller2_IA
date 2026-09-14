@@ -45,7 +45,7 @@ def hill_climbing(
         best_configuration: Configuration
         best_score: float
         evaluations: int
-        iterations: int
+        iterations: inty
         history: list[Configuration] = field(default_factory=list)
         score_history: list[float] = field(default_factory=list)
         
@@ -126,8 +126,9 @@ def cooling_schedule(initial_temperature: float, cooling_rate: float, iteration:
 
     Esta función se invoca desde simulated_annealing en cada iteración.
     """
-    # TODO: Add your code here
-    raise NotImplementedError("Punto 2: implemente cooling_schedule")
+
+    temperatura = initial_temperature * (cooling_rate ** iteration)
+    return temperatura
 
 
 def simulated_annealing(
@@ -147,8 +148,7 @@ def simulated_annealing(
 
     Tips:
     - Seleccione el candidato con rng.choice(problem.neighbors(current)) y use
-      exclusivamente rng para conservar la reproducibilidad.
-    - Obtenga la temperatura con cooling_schedule(...) y calcule la aceptación
+      exclusivamente rng para conservar la reproducibilidad   - Obtenga la temperatura con cooling_schedule(...) y calcule la aceptación
       con delta = puntaje_candidato - puntaje_actual y math.exp(...).
     - Mantenga separados el estado actual y el mejor encontrado; registre el
       estado actual después de cada intento, incluso si se rechaza.
@@ -157,8 +157,59 @@ def simulated_annealing(
     rng = rng or random.Random()
     minimum_temperature = 1e-9
 
-    # TODO: Add your code here
-    raise NotImplementedError("Punto 2: implemente simulated_annealing")
+    current_configuration = initial_configuration
+    current_score = configuration_score(problem, current_configuration)
+    best_configuration = current_configuration
+    best_score = current_score
+    history = [current_configuration]
+    score_history = [current_score]
+    evaluations = 1
+    iterations = 0
+
+    for iteration in range(max_iterations):
+        # Actualizamos la temperatura y detenemos el algoritmo si es mínima.
+        temperature = cooling_schedule(initial_temperature, cooling_rate, iteration)
+        if temperature <= minimum_temperature:
+            break
+
+        neighbors = problem.neighbors(current_configuration)
+        if not neighbors:
+            break
+
+        # Elegimos un vecino aleatorio usando únicamente rng.
+        next_configuration = rng.choice(neighbors)
+        next_score = configuration_score(problem, next_configuration)
+        evaluations += 1
+        delta = next_score - current_score
+
+        # Aceptamos siempre las mejoras.
+        accepted = delta > 0
+        if not accepted:
+            # Aceptamos soluciones peores según la probabilidad indicada.
+            accepted = rng.random() < math.exp(delta / temperature)
+
+        if accepted:
+            current_configuration = next_configuration
+            current_score = next_score
+
+        # Actualizamos el mejor estado encontrado hasta el momento.
+        if current_score > best_score:
+            best_configuration = current_configuration
+            best_score = current_score
+
+        # Registramos el estado actual después del intento.
+        history.append(current_configuration)
+        score_history.append(current_score)
+        iterations += 1
+
+    return OptimizationResult(
+        best_configuration,
+        best_score,
+        evaluations,
+        iterations,
+        history,
+        score_history,
+    )
 
 
 def one_point_crossover(
@@ -179,8 +230,13 @@ def one_point_crossover(
     if len(parent1) < 2:
         return parent1, parent2
 
-    # TODO: Add your code here
-    raise NotImplementedError("Punto 3: implemente one_point_crossover")
+    # Seleccionamos un punto de cruce interior usando rng.
+    cut = rng.randint(1, len(parent1) - 1)
+    # El primer hijo combina el prefijo del padre 1 con el sufijo del padre 2.
+    child1 = parent1[:cut] + parent2[cut:]
+    # El segundo hijo combina el prefijo del padre 2 con el sufijo del padre 1.
+    child2 = parent2[:cut] + parent1[cut:]
+    return child1, child2
 
 
 def swap_mutation(
@@ -199,8 +255,26 @@ def swap_mutation(
     - Si alguno de los dos grupos está vacío, no hay un intercambio posible.
     - Retorne una tupla nueva; no modifique el individuo recibido.
     """
-    # TODO: Add your code here
-    raise NotImplementedError("Punto 3: implemente swap_mutation")
+    # Decidimos si se aplica la mutación.
+    if rng.random() >= mutation_probability:
+        return individual
+
+    # Seleccionamos una posición que contiene 1.
+    active_indices = [index for index, value in enumerate(individual) if value == 1]
+    # Seleccionamos una posición que contiene 0.
+    inactive_indices = [index for index, value in enumerate(individual) if value == 0]
+    if not active_indices or not inactive_indices:
+        return individual
+
+    active_index = rng.choice(active_indices)
+    inactive_index = rng.choice(inactive_indices)
+    # Intercambiamos los valores y retornamos un cromosoma nuevo.
+    mutated = list(individual)
+    mutated[active_index], mutated[inactive_index] = (
+        mutated[inactive_index],
+        mutated[active_index],
+    )
+    return tuple(mutated)
 
 
 def genetic_algorithm(
@@ -236,7 +310,64 @@ def genetic_algorithm(
     if not 0 <= elite_size <= population_size:
         raise ValueError("elite_size debe estar entre 0 y population_size")
 
-    # TODO: Add your code here
-    raise NotImplementedError("Punto 3: implemente genetic_algorithm")
+    # Creamos y evaluamos la población inicial.
+    population = problem.initial_population(population_size, rng)
+    scores = [configuration_score(problem, individual) for individual in population]
+    evaluations = population_size
+
+    best_index = max(range(population_size), key=lambda index: scores[index])
+    best_configuration = population[best_index]
+    best_score = scores[best_index]
+    history = [best_configuration]
+    score_history = [best_score]
+
+    for _ in range(generations):
+        # Seleccionamos los mejores individuos para conservarlos por elitismo.
+        elite_indices = sorted(
+            range(population_size), key=lambda index: scores[index], reverse=True
+        )[:elite_size]
+        new_population = [population[index] for index in elite_indices]
+
+        # Construimos la nueva generación hasta completar su tamaño.
+        while len(new_population) < population_size:
+            # Seleccionamos dos padres mediante torneo.
+            parent1 = problem.tournament_select(population, scores, rng)
+            parent2 = problem.tournament_select(population, scores, rng)
+            # Cruzamos los padres para obtener dos descendientes.
+            child1, child2 = one_point_crossover(parent1, parent2, rng)
+
+            for child in (child1, child2):
+                if len(new_population) >= population_size:
+                    break
+                # Reparamos el cromosoma antes de aplicar la mutación.
+                repaired = problem.repair_configuration(child, rng)
+                # Mutamos el cromosoma reparado.
+                mutated = swap_mutation(repaired, mutation_probability, rng)
+                new_population.append(mutated)
+
+        population = new_population
+        # Evaluamos todos los individuos de la nueva generación.
+        scores = [configuration_score(problem, individual) for individual in population]
+        evaluations += population_size
+
+        # Actualizamos el mejor individuo global si esta generación mejora el resultado.
+        generation_best_index = max(
+            range(population_size), key=lambda index: scores[index]
+        )
+        if scores[generation_best_index] > best_score:
+            best_configuration = population[generation_best_index]
+            best_score = scores[generation_best_index]
+
+        history.append(best_configuration)
+        score_history.append(best_score)
+
+    return OptimizationResult(
+        best_configuration,
+        best_score,
+        evaluations,
+        generations,
+        history,
+        score_history,
+    )
 
 
