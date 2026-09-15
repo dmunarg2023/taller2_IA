@@ -38,5 +38,29 @@ def evaluation_function(state: GameState) -> float:
     if state.is_win() or state.is_lose():
         return base_evaluation_function(state)
 
-    # TODO: Add your code here
-    return base_evaluation_function(state)
+    defender = state.defender_position
+    intruder = state.intruder_position
+
+    terminal_distances = [
+        state.layout.distance(defender, terminal)
+        for terminal in state.pending_terminals
+    ]
+    reachable_terminals = [
+        distance for distance in terminal_distances if math.isfinite(distance)
+    ]
+    nearest_terminal = min(reachable_terminals, default=50.0)
+
+    intruder_distance = state.layout.distance(intruder, defender)
+    safe_distance = intruder_distance if math.isfinite(intruder_distance) else 50.0
+
+    value = float(state.get_score())
+    value -= 35.0 * len(state.pending_terminals)
+    value -= 4.0 * nearest_terminal
+    value += 5.0 * min(safe_distance, 20.0)
+    value += 0.5 * len(state.get_legal_actions(0))
+
+    # A un paso, MIN puede capturar al defensor en su próximo movimiento.
+    if safe_distance <= 1:
+        value -= 100.0
+
+    return max(-999.0, min(999.0, value))

@@ -90,5 +90,56 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
         - En MAX actualice alpha y corte si valor >= beta; en MIN actualice beta
           y corte si valor <= alpha.
         """
-        # TODO: Add your code here
-        raise NotImplementedError("Punto 5: implemente AlphaBetaAgent.get_action")
+        self.nodes_evaluated = 0
+
+        def alpha_beta(
+            node: GameState,
+            agent_index: int,
+            plies_left: int,
+            alpha: float,
+            beta: float,
+        ):
+            self.nodes_evaluated += 1
+            if node.is_win() or node.is_lose() or plies_left == 0:
+                return evaluation_function(node), None
+
+            actions = node.get_legal_actions(agent_index)
+            if not actions:
+                return evaluation_function(node), None
+
+            next_agent = (agent_index + 1) % node.get_num_agents()
+            best_action = actions[0]
+
+            if agent_index == 0:
+                best_value = float("-inf")
+                for action in actions:
+                    successor = node.generate_successor(agent_index, action)
+                    value, _ = alpha_beta(
+                        successor, next_agent, plies_left - 1, alpha, beta
+                    )
+                    if value > best_value:
+                        best_value = value
+                        best_action = action
+                    if best_value >= beta:
+                        break
+                    alpha = max(alpha, best_value)
+                return best_value, best_action
+
+            best_value = float("inf")
+            for action in actions:
+                successor = node.generate_successor(agent_index, action)
+                value, _ = alpha_beta(
+                    successor, next_agent, plies_left - 1, alpha, beta
+                )
+                if value < best_value:
+                    best_value = value
+                    best_action = action
+                if best_value <= alpha:
+                    break
+                beta = min(beta, best_value)
+            return best_value, best_action
+
+        _, action = alpha_beta(
+            state, 0, self.depth, float("-inf"), float("inf")
+        )
+        return action
